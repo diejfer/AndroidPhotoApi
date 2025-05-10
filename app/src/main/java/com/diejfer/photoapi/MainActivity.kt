@@ -36,29 +36,27 @@ class MainActivity : ComponentActivity() {
             if (permissions.all { it.value }) {
                 startHttpServer()
             } else {
-                Toast.makeText(this, "Permisos denegados", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Limpieza: removemos duplicado innecesario de ScrollView
-
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
         val widthInput = android.widget.EditText(this).apply {
-            hint = "Ancho (ej: 1920)"
+            hint = "Width (e.g., 1920)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
         val heightInput = android.widget.EditText(this).apply {
-            hint = "Alto (ej: 1080)"
+            hint = "Height (e.g., 1080)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
         val focusInput = android.widget.EditText(this).apply {
-            hint = "Foco (ej: 0.0)"
+            hint = "Focus (e.g., 0.0)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
         val afCheckbox = android.widget.CheckBox(this).apply {
@@ -66,16 +64,16 @@ class MainActivity : ComponentActivity() {
             isChecked = true
         }
         val exposureInput = android.widget.EditText(this).apply {
-            hint = "Exposición (ns, ej: 50000000)"
+            hint = "Exposure (ns, e.g., 50000000)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
         val isoInput = android.widget.EditText(this).apply {
-            hint = "ISO (ej: 400)"
+            hint = "ISO (e.g., 400)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
 
         val captureButton = android.widget.Button(this).apply {
-            text = "Capturar"
+            text = "Capture"
             setOnClickListener {
                 val width = widthInput.text.toString().toIntOrNull() ?: 1920
                 val height = heightInput.text.toString().toIntOrNull() ?: 1080
@@ -83,7 +81,7 @@ class MainActivity : ComponentActivity() {
                 val af = afCheckbox.isChecked
                 val exposure = exposureInput.text.toString().toLongOrNull()
                 val iso = isoInput.text.toString().toIntOrNull()
-                log("Captura manual: width=$width, height=$height, focus=$focus, af=$af, exposure=$exposure, iso=$iso")
+                log("Manual capture: width=$width, height=$height, focus=$focus, af=$af, exposure=$exposure, iso=$iso")
                 takePhoto(width, height, focus, af, exposure, iso)
             }
         }
@@ -142,20 +140,20 @@ class MainActivity : ComponentActivity() {
         server.get("/index.html") { _, response ->
             val html = """
                 <html>
-                <head><title>Servidor de Fotos</title></head>
+                <head><title>Photo Server</title></head>
                 <body>
-                    <h2>Bienvenido al servidor de captura de fotos</h2>
-                    <p><b>Endpoint disponible:</b> <code>/capture</code></p>
-                    <p><b>Parámetros opcionales:</b></p>
+                    <h2>Welcome to the photo capture server</h2>
+                    <p><b>Available endpoint:</b> <code>/capture</code></p>
+                    <p><b>Optional parameters:</b></p>
                     <ul>
-                        <li><code>width</code>: ancho (default 1920)</li>
-                        <li><code>height</code>: alto (default 1080)</li>
-                        <li><code>focus</code>: distancia de enfoque (0.0 = infinito)</li>
+                        <li><code>width</code>: width (default 1920)</li>
+                        <li><code>height</code>: height (default 1080)</li>
+                        <li><code>focus</code>: focus distance (0.0 = infinity)</li>
                         <li><code>af</code>: autofocus (true/false)</li>
-                        <li><code>exposure</code>: tiempo en nanosegundos</li>
-                        <li><code>iso</code>: sensibilidad ISO</li>
+                        <li><code>exposure</code>: time in nanoseconds</li>
+                        <li><code>iso</code>: ISO sensitivity</li>
                     </ul>
-                    <p><b>Ejemplo:</b></p>
+                    <p><b>Example:</b></p>
                     <pre><a href="http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000000&iso=400">
 http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000000&iso=400</a></pre>
                 </body>
@@ -173,7 +171,7 @@ http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000
             val exposureTime = query.getString("exposure")?.toLongOrNull()
             val iso = query.getString("iso")?.toIntOrNull()
 
-            log("Petición: ${request.path}")
+            log("Request: ${request.path}")
             log("width=$width, height=$height, focus=$focus, af=$af, exposure=$exposureTime, iso=$iso")
 
             takePhoto(width, height, focus, af, exposureTime, iso)
@@ -181,18 +179,17 @@ http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000
             Handler(Looper.getMainLooper()).postDelayed({
                 latestImageBytes?.let {
                     response.send("image/jpeg", it)
-                    log("Foto enviada (${it.size} bytes)")
+                    log("Photo sent (${it.size} bytes)")
                 } ?: run {
                     response.send("No image captured")
-                    log("Error: no se capturó imagen")
+                    log("Error: no image captured")
                 }
             }, 1500)
         }
 
         server.listen(AsyncServer.getDefault(), 8080)
 
-        log("Servidor iniciado en http://$ip:8080")
-
+        log("Server started at http://$ip:8080")
     }
 
     fun getLocalIpAddress(context: Context): String? {
@@ -225,7 +222,7 @@ http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000
             image.close()
             cameraDevice?.close()
             captureSession?.close()
-            log("Foto capturada")
+            log("Photo captured")
             latestImageBytes?.let {
                 val bitmap = android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)
                 runOnUiThread { imageView.setImageBitmap(bitmap) }
@@ -263,28 +260,29 @@ http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000
                         session.capture(captureRequestBuilder.build(), object : CameraCaptureSession.CaptureCallback() {
                             override fun onCaptureCompleted(session: CameraCaptureSession, request: CaptureRequest, result: TotalCaptureResult) {
                                 super.onCaptureCompleted(session, request, result)
-                                log("Captura completada con AF")
+                                log("Capture completed with AF")
                             }
                         }, null)
                     }
 
                     override fun onConfigureFailed(session: CameraCaptureSession) {
-                        log("Error: fallo la configuración de la sesión")
+                        log("Error: session configuration failed")
                     }
                 }, null)
             }
 
             override fun onDisconnected(device: CameraDevice) {
                 device.close()
-                log("Cámara desconectada")
+                log("Camera disconnected")
             }
 
             override fun onError(device: CameraDevice, error: Int) {
                 device.close()
-                log("Error en la cámara: $error")
+                log("Camera error: $error")
             }
         }, Handler(Looper.getMainLooper()))
     }
+
     override fun onDestroy() {
         server.stop()
         cameraDevice?.close()
@@ -292,4 +290,3 @@ http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000
         super.onDestroy()
     }
 }
-
