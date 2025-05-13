@@ -9,15 +9,20 @@ PhotoAPI turns your Android device into a simple camera server that can capture 
 - HTTP server listening on port `8080`.
 - `/capture` endpoint with full control over camera parameters.
 - Query string parameters supported:
-  - `width`: image width (default: 1920)
-  - `height`: image height (default: 1080)
-  - `focus`: manual focus distance (0.0 = infinity)
-  - `af`: autofocus (`true` or `false`)
-  - `exposure`: shutter time in nanoseconds (e.g. `50000000` = 50ms)
-  - `iso`: ISO sensitivity (e.g. 400)
+    - `width`: image width (default: 1920)
+    - `height`: image height (default: 1080)
+    - `focus`: manual focus distance (0.0 = infinity)
+    - `af`: autofocus (`true` or `false`)
+    - `exposure`: shutter time in nanoseconds (e.g. `50000000` = 50ms)
+    - `iso`: ISO sensitivity (e.g. 400)
+    - `savePhoto`: defines how the photo is handled (`return`, `local`, `returnAndLocal`)
+        - `return`: returns the photo in the HTTP response (default)
+        - `local`: saves the photo in the device’s Pictures folder
+        - `returnAndLocal`: does both
+
 - Real-time camera log shown on screen.
 - Image preview shown after each capture.
-- Manual capture interface included in the app with test fields.
+- Manual capture interface included in the app with test fields (always saves locally).
 
 ---
 
@@ -25,9 +30,9 @@ PhotoAPI turns your Android device into a simple camera server that can capture 
 
 1. Install the app on an Android device connected to Wi-Fi.
 2. Open the app and grant camera permissions.
-3. On a device in the same network (e.g. NodeMCU), send a request like:
-   GET http://<ANDROID_IP>:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000000&iso=400
-4. View a built-in help page from a browser:
+3. On a device in the same network (e.g. NodeMCU), send a request like:  
+   GET http://<ANDROID_IP>:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000000&iso=400&savePhoto=returnAndLocal
+4. View a built-in help page from a browser:  
    http://<ANDROID_IP>:8080/index.html
 
 ---
@@ -40,6 +45,7 @@ The app includes a built-in test interface with:
 - A toggle for autofocus.
 - A **Capture** button.
 - On-screen preview of the last captured photo.
+- **Note:** Photos captured via this interface are always saved locally to the device.
 
 ---
 
