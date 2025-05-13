@@ -83,6 +83,27 @@ class MainActivity : ComponentActivity() {
                 val iso = isoInput.text.toString().toIntOrNull()
                 log("Manual capture: width=$width, height=$height, focus=$focus, af=$af, exposure=$exposure, iso=$iso")
                 takePhoto(width, height, focus, af, exposure, iso)
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    latestImageBytes?.let { bytes ->
+                        val context = applicationContext
+                        var savedPath: String? = null
+                        val filename = "slide_${System.currentTimeMillis()}.jpg"
+                        val picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+                        val file = java.io.File(picturesDir, filename)
+                        file.writeBytes(bytes)
+                        savedPath = file.absolutePath
+                        log("Photo saved locally: $savedPath")
+
+                        android.media.MediaScannerConnection.scanFile(
+                            context,
+                            arrayOf(file.absolutePath),
+                            arrayOf("image/jpeg"),
+                            null
+                        )
+
+                    }
+                }, 1500)
             }
         }
 
@@ -139,28 +160,32 @@ class MainActivity : ComponentActivity() {
 
         server.get("/index.html") { _, response ->
             val html = """
-                <html>
-                <head><title>Photo Server</title></head>
-                <body>
-                    <h2>Welcome to the photo capture server</h2>
-                    <p><b>Available endpoint:</b> <code>/capture</code></p>
-                    <p><b>Optional parameters:</b></p>
-                    <ul>
-                        <li><code>width</code>: width (default 1920)</li>
-                        <li><code>height</code>: height (default 1080)</li>
-                        <li><code>focus</code>: focus distance (0.0 = infinity)</li>
-                        <li><code>af</code>: autofocus (true/false)</li>
-                        <li><code>exposure</code>: time in nanoseconds</li>
-                        <li><code>iso</code>: ISO sensitivity</li>
-                    </ul>
-                    <p><b>Example:</b></p>
-                    <pre><a href="http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000000&iso=400">
-http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000000&iso=400</a></pre>
-                </body>
-                </html>
-            """.trimIndent()
+        <html>
+        <head><title>Photo Server</title></head>
+        <body>
+            <h2>Welcome to the photo capture server</h2>
+            <p><b>Available endpoint:</b> <code>/capture</code></p>
+            <p><b>Optional parameters:</b></p>
+            <ul>
+                <li><code>width</code>: width (default 1920)</li>
+                <li><code>height</code>: height (default 1080)</li>
+                <li><code>focus</code>: focus distance (0.0 = infinity)</li>
+                <li><code>af</code>: autofocus (true/false)</li>
+                <li><code>exposure</code>: exposure time in nanoseconds</li>
+                <li><code>iso</code>: ISO sensitivity</li>
+                <li><code>savePhoto</code>: one of <code>return</code>, <code>local</code>, or <code>returnAndLocal</code></li>
+            </ul>
+            <p><b>Examples:</b></p>
+            <pre><a href="http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000000&iso=400&savePhoto=return">
+http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000000&iso=400&savePhoto=return</a></pre>
+            <pre><a href="http://$ip:8080/capture?savePhoto=local">
+http://$ip:8080/capture?savePhoto=local</a></pre>
+        </body>
+        </html>
+    """.trimIndent()
             response.send("text/html", html)
         }
+
 
         server.get("/capture") { request, response ->
             val query = request.query
@@ -170,22 +195,58 @@ http://$ip:8080/capture?width=1920&height=1080&focus=0.0&af=false&exposure=50000
             val af = query.getString("af")?.toBooleanStrictOrNull() ?: false
             val exposureTime = query.getString("exposure")?.toLongOrNull()
             val iso = query.getString("iso")?.toIntOrNull()
+            val savePhoto = query.getString("savePhoto") ?: "return" // default
 
             log("Request: ${request.path}")
-            log("width=$width, height=$height, focus=$focus, af=$af, exposure=$exposureTime, iso=$iso")
+            log("width=$width, height=$height, focus=$focus, af=$af, exposure=$exposureTime, iso=$iso, savePhoto=$savePhoto")
 
             takePhoto(width, height, focus, af, exposureTime, iso)
 
             Handler(Looper.getMainLooper()).postDelayed({
-                latestImageBytes?.let {
-                    response.send("image/jpeg", it)
-                    log("Photo sent (${it.size} bytes)")
+                latestImageBytes?.let { bytes ->
+                    val context = applicationContext
+                    var savedPath: String? = null
+
+                    if (savePhoto == "local" || savePhoto == "returnAndLocal") {
+                        val filename = "slide_${System.currentTimeMillis()}.jpg"
+                        val picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+                        val file = java.io.File(picturesDir, filename)
+                        file.writeBytes(bytes)
+                        savedPath = file.absolutePath
+                        log("Photo saved locally: $savedPath")
+
+                        android.media.MediaScannerConnection.scanFile(
+                            context,
+                            arrayOf(file.absolutePath),
+                            arrayOf("image/jpeg"),
+                            null
+                        )
+
+                    }
+
+                    when (savePhoto) {
+                        "return" -> {
+                            response.send("image/jpeg", bytes)
+                            log("Photo returned (${bytes.size} bytes)")
+                        }
+                        "local" -> {
+                            response.code(200).send("Saved at: $savedPath")
+                        }
+                        "returnAndLocal" -> {
+                            response.send("image/jpeg", bytes)
+                            log("Photo returned and saved (${bytes.size} bytes at $savedPath)")
+                        }
+                        else -> {
+                            response.code(400).send("Invalid savePhoto value")
+                        }
+                    }
                 } ?: run {
                     response.send("No image captured")
                     log("Error: no image captured")
                 }
             }, 1500)
         }
+
 
         server.listen(AsyncServer.getDefault(), 8080)
 
